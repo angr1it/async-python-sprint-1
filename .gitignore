@@ -1,5 +1,7 @@
-
+*.log
 creds.ini
 .idea/
 __pycache__/
 *.pyc
+.vscode/
+data/
