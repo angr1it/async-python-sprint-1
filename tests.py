@@ -38,8 +38,8 @@ class TestDataFetchingTask(unittest.TestCase):
         self.assertEqual(item, ('MOSCOW', 'tests/data/responses/MOSCOW.json'))
 
         (_, path) = item
-        file = open(path)
-        data = json.load(file)
+        with open(path) as file:
+            data = json.load(file)
         self.assertIn('forecasts', data)
 
 
@@ -58,8 +58,8 @@ class TestDataCalculationTask(unittest.TestCase):
         self.assertEqual(item, ('BEIJING', 'tests/data/calculated/BEIJING.json'))
 
         (_, path) = item
-        file = open(path)
-        data = json.load(file)
+        with open(path) as file:
+            data = json.load(file)
         self.assertIn('days', data)
 
         days = data['days']
@@ -73,20 +73,12 @@ class TestDataAnalyzingTask(unittest.TestCase):
 
     def test_DataAnalyzingTask(self):
 
-        analyzeQueue = multiprocessing.Queue()
-        aggregationQueue = multiprocessing.Queue()
-        analyzeQueue.put(('BERLIN', 'tests/data/calculated/BERLIN.json'))
+        result = DataAnalyzingTask.run('BERLIN', 'tests/data/calculated/BERLIN.json', TEST_ANALYZED_PATH)
 
-        process = DataAnalyzingTask(analyzeQueue, aggregationQueue, TEST_ANALYZED_PATH)
-        process.start()
-        process.join()
-
-        (city, obj) = aggregationQueue.get()
-        
-        self.assertEqual(city, 'BERLIN')
-        self.assertEqual(obj['path'], 'tests/data/analyzed/BERLIN.txt')
-        self.assertIn('temp_avg', obj)
-        self.assertIn('relevant_cond_hours', obj)
+        self.assertEqual(result['city'], 'BERLIN')
+        self.assertEqual(result['path'], 'tests/data/analyzed/BERLIN.txt')
+        self.assertIn('temp_avg', result)
+        self.assertIn('relevant_cond_hours', result)
 
         #TODO: write asserts for file content
 
@@ -95,14 +87,9 @@ class TestDataAggregationTask(unittest.TestCase):
 
     def test_DataAggregationTask(self):
 
-        aggregationQueue = multiprocessing.Queue()
-        aggregationQueue.put(('tests/data/analyzed/BUCHAREST.txt', 1))
-
         with open(TEST_RESULT_PATH, newline='', mode='w') as f:
             f.write('')
-        process = DataAggregationTask(aggregationQueue, threading.Lock(), TEST_RESULT_PATH)
-        process.start()
-        process.join()
+        DataAggregationTask.run('tests/data/analyzed/BUCHAREST.txt', 1, threading.Lock(), TEST_RESULT_PATH)
 
         with open(TEST_RESULT_PATH, newline='', mode='r') as f:
             doc = f.read()
@@ -113,6 +100,12 @@ class TestDataAggregationTask(unittest.TestCase):
         '''
 
         self.assertEqual(re.sub('[^A-Za-z0-9]+', '', result), re.sub('[^A-Za-z0-9]+', '', doc))
+
+
+class TestForecasting(unittest.TestCase):
+    
+    def test_empty(self):
+        self.assertRaises(forecasting.NotEnoughData, forecasting.forecast_weather, {}, TEST_FORECASTING_RESULT_PATH)
 
 
 if __name__ == '__main__':
